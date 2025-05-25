@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Trash2, Edit, Power, PowerOff } from "lucide-react"
+import { Plus, Trash2, Edit, Power, PowerOff, RefreshCw } from "lucide-react"
 
 export function ConnectionPanel() {
   const { connections, addConnection, removeConnection, connectToRedis, disconnectFromRedis } = useConnection()
@@ -29,17 +29,38 @@ export function ConnectionPanel() {
     username: "",
     password: "",
   })
+  const [isConnecting, setIsConnecting] = useState<Record<string, boolean>>({})
 
-  const handleAddConnection = () => {
-    addConnection(newConnection)
-    setNewConnection({
-      name: "",
-      host: "",
-      port: 6379,
-      username: "",
-      password: "",
-    })
-    setIsAddingConnection(false)
+  const handleAddConnection = async () => {
+    try {
+      await addConnection(newConnection)
+      setNewConnection({
+        name: "",
+        host: "",
+        port: 6379,
+        username: "",
+        password: "",
+      })
+      setIsAddingConnection(false)
+    } catch (error) {
+      console.error("Failed to add connection:", error)
+    }
+  }
+
+  const handleToggleConnection = async (connectionId: string, isConnected: boolean) => {
+    setIsConnecting((prev) => ({ ...prev, [connectionId]: true }))
+
+    try {
+      if (isConnected) {
+        await disconnectFromRedis(connectionId)
+      } else {
+        await connectToRedis(connectionId)
+      }
+    } catch (error) {
+      console.error("Connection toggle failed:", error)
+    } finally {
+      setIsConnecting((prev) => ({ ...prev, [connectionId]: false }))
+    }
   }
 
   return (
@@ -74,7 +95,7 @@ export function ConnectionPanel() {
                 <Input
                   id="host"
                   placeholder="localhost or redis.example.com"
-                  className="bg-gray-800 border-gray-700"
+                  className="bg-input"
                   value={newConnection.host}
                   onChange={(e) => setNewConnection({ ...newConnection, host: e.target.value })}
                 />
@@ -85,7 +106,7 @@ export function ConnectionPanel() {
                   id="port"
                   type="number"
                   placeholder="6379"
-                  className="bg-gray-800 border-gray-700"
+                  className="bg-input"
                   value={newConnection.port}
                   onChange={(e) => setNewConnection({ ...newConnection, port: Number.parseInt(e.target.value) })}
                 />
@@ -95,7 +116,7 @@ export function ConnectionPanel() {
                 <Input
                   id="username"
                   placeholder="Username"
-                  className="bg-gray-800 border-gray-700"
+                  className="bg-input"
                   value={newConnection.username}
                   onChange={(e) => setNewConnection({ ...newConnection, username: e.target.value })}
                 />
@@ -106,7 +127,7 @@ export function ConnectionPanel() {
                   id="password"
                   type="password"
                   placeholder="Password"
-                  className="bg-gray-800 border-gray-700"
+                  className="bg-input"
                   value={newConnection.password}
                   onChange={(e) => setNewConnection({ ...newConnection, password: e.target.value })}
                 />
@@ -142,7 +163,7 @@ export function ConnectionPanel() {
             </TableHeader>
             <TableBody>
               {connections.map((connection) => (
-                <TableRow key={connection.id} className="border-gray-800">
+                <TableRow key={connection.id} className="border-border">
                   <TableCell>{connection.name}</TableCell>
                   <TableCell>{connection.host}</TableCell>
                   <TableCell>{connection.port}</TableCell>
@@ -162,16 +183,17 @@ export function ConnectionPanel() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          if (connection.isConnected) {
-                            disconnectFromRedis(connection.id)
-                          } else {
-                            connectToRedis(connection.id)
-                          }
-                        }}
+                        onClick={() => handleToggleConnection(connection.id, connection.isConnected)}
                         className={connection.isConnected ? "text-green-500" : "text-gray-400"}
+                        disabled={isConnecting[connection.id]}
                       >
-                        {connection.isConnected ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                        {isConnecting[connection.id] ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : connection.isConnected ? (
+                          <PowerOff className="h-4 w-4" />
+                        ) : (
+                          <Power className="h-4 w-4" />
+                        )}
                       </Button>
                       <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
                         <Edit className="h-4 w-4" />

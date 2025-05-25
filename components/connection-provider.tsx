@@ -115,6 +115,9 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
         description: `${newConnection.name} has been added successfully`,
       })
 
+      // Automatically connect to the new connection
+      await connectToRedis(newConnection.id)
+
       return
     } catch (err: any) {
       const errorMsg = err.message || "Failed to add connection"

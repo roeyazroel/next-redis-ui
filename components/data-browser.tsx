@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Folder,
   FolderOpen,
+  GripVertical,
 } from "lucide-react"
 import { KeyValueEditor } from "@/components/key-value-editor"
 import { JsonViewer } from "@/components/json-viewer"
@@ -27,6 +28,7 @@ import { EnhancedSearch } from "@/components/enhanced-search"
 import { toast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 
 type KeyInfo = {
   key: string
@@ -456,214 +458,224 @@ export function DataBrowser() {
   }
 
   return (
-    <div className="h-full flex">
-      <div className="w-80 border-r border-border flex flex-col">
-        <div className="p-4 border-b border-border">
-          <EnhancedSearch onSearch={handleSearch} />
-          <div className="mt-2 flex items-center gap-2">
-            <Label htmlFor="delimiter" className="text-xs text-muted-foreground">
-              Delimiter:
-            </Label>
-            <Input
-              id="delimiter"
-              type="text"
-              value={delimiter}
-              onChange={(e) => setDelimiter(e.target.value || ":")}
-              className="h-7 w-16 text-xs"
-              placeholder=":"
-            />
-          </div>
-        </div>
-        <div className="flex items-center justify-between p-2 border-b border-border">
-          <span className="text-xs font-medium text-muted-foreground px-2">
-            {isLoading ? "Loading..." : `${keys.length} KEYS`}
-          </span>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefresh} disabled={isLoading}>
-              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7">
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-auto">
-          {error && (
-            <div className="p-4 text-sm text-red-500 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              {error}
-              <Button variant="ghost" size="sm" className="ml-auto h-6 px-2 text-xs" onClick={handleRefresh}>
-                Retry
-              </Button>
-            </div>
-          )}
-
-          {treeData && renderTreeNode(treeData)}
-
-          {!isLoading && !error && keys.length === 0 && (
-            <div className="p-4 text-center text-muted-foreground">No keys found</div>
-          )}
-
-          {isLoading && keys.length === 0 && (
-            <div className="p-4 flex justify-center">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col">
-        {selectedKey ? (
-          <>
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <div>
-                <h3 className="font-mono text-sm">{selectedKey}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  {keys.find((k) => k.key === selectedKey)?.type && (
-                    <Badge
-                      variant="outline"
-                      className={getTypeColor(keys.find((k) => k.key === selectedKey)?.type || "")}
-                    >
-                      {keys.find((k) => k.key === selectedKey)?.type}
-                    </Badge>
-                  )}
-                  {(keys.find((k) => k.key === selectedKey)?.ttl || 0) > 0 && (
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {keys.find((k) => k.key === selectedKey)?.ttl}s
-                    </div>
-                  )}
-                </div>
+    <div className="h-full">
+      <ResizablePanelGroup direction="horizontal" className="h-full">
+        <ResizablePanel defaultSize={25} minSize={15} maxSize={50} className="border-r border-border">
+          <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-border">
+              <EnhancedSearch onSearch={handleSearch} />
+              <div className="mt-2 flex items-center gap-2">
+                <Label htmlFor="delimiter" className="text-xs text-muted-foreground">
+                  Delimiter:
+                </Label>
+                <Input
+                  id="delimiter"
+                  type="text"
+                  value={delimiter}
+                  onChange={(e) => setDelimiter(e.target.value || ":")}
+                  className="h-7 w-16 text-xs"
+                  placeholder=":"
+                />
               </div>
+            </div>
+            <div className="flex items-center justify-between p-2 border-b border-border">
+              <span className="text-xs font-medium text-muted-foreground px-2">
+                {isLoading ? "Loading..." : `${keys.length} KEYS`}
+              </span>
               <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      typeof keyData === "object" ? JSON.stringify(keyData) : String(keyData),
-                    )
-                    toast({
-                      title: "Copied",
-                      description: "Key value copied to clipboard",
-                    })
-                  }}
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefresh} disabled={isLoading}>
+                  <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8"
-                  onClick={() => setIsEditing(!isEditing)}
-                  disabled={isLoading}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-red-500 hover:text-red-400"
-                  onClick={handleDeleteKey}
-                  disabled={isLoading}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
-
-            {isLoading && (
-              <div className="flex-1 flex items-center justify-center">
-                <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            )}
-
-            {error && !isLoading && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
-                  <h3 className="text-xl font-medium mb-2">Error</h3>
-                  <p className="text-muted-foreground mb-4">{error}</p>
-                  <Button onClick={() => fetchKeyData(selectedKey)} className="bg-red-500 hover:bg-red-600">
+            <div className="flex-1 overflow-auto">
+              {error && (
+                <div className="p-4 text-sm text-red-500 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  {error}
+                  <Button variant="ghost" size="sm" className="ml-auto h-6 px-2 text-xs" onClick={handleRefresh}>
                     Retry
                   </Button>
                 </div>
-              </div>
-            )}
+              )}
 
-            {!isLoading && !error && isEditing ? (
-              <div className="flex-1 p-4">
-                <KeyValueEditor data={keyData} onSave={handleSaveKey} onCancel={() => setIsEditing(false)} />
-              </div>
-            ) : (
-              !isLoading &&
-              !error && (
-                <div className="flex-1 p-4">
-                  <Tabs value={viewMode} onValueChange={setViewMode} className="h-full flex flex-col">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="table">Table View</TabsTrigger>
-                      <TabsTrigger value="json">JSON View</TabsTrigger>
-                      <TabsTrigger value="text">Text View</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="table" className="flex-1 m-0">
-                      <div className="border border-border rounded-md overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="hover:bg-transparent border-border">
-                              <TableHead className="text-muted-foreground">Key</TableHead>
-                              <TableHead className="text-muted-foreground">Value</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {typeof keyData === "object" && keyData !== null ? (
-                              Object.entries(keyData).map(([key, value]) => (
-                                <TableRow key={key} className="border-border">
-                                  <TableCell className="font-mono">{key}</TableCell>
-                                  <TableCell className="font-mono">
-                                    {typeof value === "object"
-                                      ? JSON.stringify(value).substring(0, 100) +
-                                        (JSON.stringify(value).length > 100 ? "..." : "")
-                                      : String(value)}
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            ) : (
-                              <TableRow className="border-border">
-                                <TableCell className="font-mono">value</TableCell>
-                                <TableCell className="font-mono">{String(keyData)}</TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="json" className="flex-1 m-0">
-                      <JsonViewer data={keyData} />
-                    </TabsContent>
-                    <TabsContent value="text" className="flex-1 m-0">
-                      <div className="bg-card border border-border rounded-md p-4 font-mono text-sm whitespace-pre-wrap h-full overflow-auto">
-                        {typeof keyData === "object" ? JSON.stringify(keyData, null, 2) : String(keyData)}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
+              {treeData && renderTreeNode(treeData)}
+
+              {!isLoading && !error && keys.length === 0 && (
+                <div className="p-4 text-center text-muted-foreground">No keys found</div>
+              )}
+
+              {isLoading && keys.length === 0 && (
+                <div className="p-4 flex justify-center">
+                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              )
-            )}
-          </>
-        ) : (
-          <div className="h-full flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <Database className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-xl font-medium mb-2">No Key Selected</h3>
-              <p>Select a key from the list to view its data</p>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle>
+          <div className="flex h-full w-full items-center justify-center">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </ResizableHandle>
+
+        <ResizablePanel defaultSize={75} className="flex flex-col">
+          {selectedKey ? (
+            <>
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h3 className="font-mono text-sm">{selectedKey}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    {keys.find((k) => k.key === selectedKey)?.type && (
+                      <Badge
+                        variant="outline"
+                        className={getTypeColor(keys.find((k) => k.key === selectedKey)?.type || "")}
+                      >
+                        {keys.find((k) => k.key === selectedKey)?.type}
+                      </Badge>
+                    )}
+                    {(keys.find((k) => k.key === selectedKey)?.ttl || 0) > 0 && (
+                      <div className="flex items-center text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {keys.find((k) => k.key === selectedKey)?.ttl}s
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        typeof keyData === "object" ? JSON.stringify(keyData) : String(keyData),
+                      )
+                      toast({
+                        title: "Copied",
+                        description: "Key value copied to clipboard",
+                      })
+                    }}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setIsEditing(!isEditing)}
+                    disabled={isLoading}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-red-500 hover:text-red-400"
+                    onClick={handleDeleteKey}
+                    disabled={isLoading}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+
+              {isLoading && (
+                <div className="flex-1 flex items-center justify-center">
+                  <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
+              {error && !isLoading && (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+                    <h3 className="text-xl font-medium mb-2">Error</h3>
+                    <p className="text-muted-foreground mb-4">{error}</p>
+                    <Button onClick={() => fetchKeyData(selectedKey)} className="bg-red-500 hover:bg-red-600">
+                      Retry
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!isLoading && !error && isEditing ? (
+                <div className="flex-1 p-4">
+                  <KeyValueEditor data={keyData} onSave={handleSaveKey} onCancel={() => setIsEditing(false)} />
+                </div>
+              ) : (
+                !isLoading &&
+                !error && (
+                  <div className="flex-1 p-4">
+                    <Tabs value={viewMode} onValueChange={setViewMode} className="h-full flex flex-col">
+                      <TabsList className="mb-4">
+                        <TabsTrigger value="table">Table View</TabsTrigger>
+                        <TabsTrigger value="json">JSON View</TabsTrigger>
+                        <TabsTrigger value="text">Text View</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="table" className="flex-1 m-0">
+                        <div className="border border-border rounded-md overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="hover:bg-transparent border-border">
+                                <TableHead className="text-muted-foreground">Key</TableHead>
+                                <TableHead className="text-muted-foreground">Value</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {typeof keyData === "object" && keyData !== null ? (
+                                Object.entries(keyData).map(([key, value]) => (
+                                  <TableRow key={key} className="border-border">
+                                    <TableCell className="font-mono">{key}</TableCell>
+                                    <TableCell className="font-mono">
+                                      {typeof value === "object"
+                                        ? JSON.stringify(value).substring(0, 100) +
+                                          (JSON.stringify(value).length > 100 ? "..." : "")
+                                        : String(value)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              ) : (
+                                <TableRow className="border-border">
+                                  <TableCell className="font-mono">value</TableCell>
+                                  <TableCell className="font-mono">{String(keyData)}</TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </TabsContent>
+                      <TabsContent value="json" className="flex-1 m-0">
+                        <JsonViewer data={keyData} />
+                      </TabsContent>
+                      <TabsContent value="text" className="flex-1 m-0">
+                        <div className="bg-card border border-border rounded-md p-4 font-mono text-sm whitespace-pre-wrap h-full overflow-auto">
+                          {typeof keyData === "object" ? JSON.stringify(keyData, null, 2) : String(keyData)}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                )
+              )}
+            </>
+          ) : (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <Database className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-xl font-medium mb-2">No Key Selected</h3>
+                <p>Select a key from the list to view its data</p>
+              </div>
+            </div>
+          )}
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   )
 }
