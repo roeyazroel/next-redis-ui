@@ -7,83 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Plus, Trash2, Edit, Copy, Clock, Database } from "lucide-react"
+import { RefreshCw, Plus, Trash2, Edit, Copy, Clock, Database, AlertCircle } from "lucide-react"
 import { KeyValueEditor } from "@/components/key-value-editor"
 import { JsonViewer } from "@/components/json-viewer"
 import { EnhancedSearch } from "@/components/enhanced-search"
-
-// Mock data
-const mockKeys = [
-  { key: "user:1000", type: "hash", ttl: -1, size: "1.2 KB" },
-  { key: "session:abc123", type: "string", ttl: 3600, size: "256 B" },
-  { key: "products", type: "list", ttl: -1, size: "45.3 KB" },
-  { key: "notifications:user:1000", type: "set", ttl: 86400, size: "512 B" },
-  { key: "leaderboard:global", type: "zset", ttl: -1, size: "12.8 KB" },
-  { key: "config:app", type: "hash", ttl: -1, size: "768 B" },
-  { key: "cache:popular-posts", type: "json", ttl: 1800, size: "24.5 KB" },
-  { key: "rate-limit:ip:192.168.1.1", type: "string", ttl: 60, size: "128 B" },
-  { key: "user:1001", type: "hash", ttl: -1, size: "1.4 KB" },
-  { key: "user:1002", type: "hash", ttl: -1, size: "1.1 KB" },
-]
-
-const mockKeyData = {
-  "user:1000": {
-    id: 1000,
-    username: "johndoe",
-    email: "john@example.com",
-    created_at: "2023-05-15T10:30:00Z",
-    last_login: "2023-06-10T14:22:15Z",
-    preferences: {
-      theme: "dark",
-      notifications: true,
-      language: "en-US",
-    },
-  },
-  "session:abc123": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  products: ["product:1", "product:2", "product:3", "product:4", "product:5"],
-  "notifications:user:1000": ["notification:1", "notification:2", "notification:3"],
-  "leaderboard:global": [
-    { member: "user:1000", score: 1250 },
-    { member: "user:1042", score: 1100 },
-    { member: "user:985", score: 950 },
-  ],
-  "config:app": {
-    debug: false,
-    cache_ttl: 3600,
-    max_connections: 100,
-    version: "1.2.3",
-  },
-  "cache:popular-posts": [
-    { id: 1, title: "Getting Started with Redis", views: 1250 },
-    { id: 2, title: "Advanced Redis Patterns", views: 980 },
-    { id: 3, title: "Redis vs. MongoDB", views: 1420 },
-  ],
-  "rate-limit:ip:192.168.1.1": "5",
-  "user:1001": {
-    id: 1001,
-    username: "janedoe",
-    email: "jane@example.com",
-    created_at: "2023-04-22T08:15:00Z",
-    last_login: "2023-06-09T11:45:30Z",
-    preferences: {
-      theme: "light",
-      notifications: false,
-      language: "en-GB",
-    },
-  },
-  "user:1002": {
-    id: 1002,
-    username: "bobsmith",
-    email: "bob@example.com",
-    created_at: "2023-05-30T16:20:00Z",
-    last_login: "2023-06-08T09:10:45Z",
-    preferences: {
-      theme: "system",
-      notifications: true,
-      language: "fr-FR",
-    },
-  },
-}
+import { toast } from "@/components/ui/use-toast"
 
 type KeyInfo = {
   key: string
@@ -108,27 +36,193 @@ export function DataBrowser() {
   const [isEditing, setIsEditing] = useState(false)
   const [currentSearchTerm, setCurrentSearchTerm] = useState("")
   const [currentFilters, setCurrentFilters] = useState<SearchFilter>({})
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Load mock data
+  // Fetch keys when connection changes
   useEffect(() => {
     if (activeConnection?.isConnected) {
-      setKeys(mockKeys)
-      applyFilters(mockKeys, currentSearchTerm, currentFilters)
-      if (selectedKey) {
-        setKeyData(mockKeyData[selectedKey])
-      }
+      fetchKeys()
     } else {
       setKeys([])
       setFilteredKeys([])
       setSelectedKey(null)
       setKeyData(null)
     }
+  }, [activeConnection])
+
+  // Fetch key data when selected key changes
+  useEffect(() => {
+    if (activeConnection?.isConnected && selectedKey) {
+      fetchKeyData(selectedKey)
+    }
   }, [activeConnection, selectedKey])
+
+  const fetchKeys = async (pattern = "*") => {
+    if (!activeConnection?.isConnected) return
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(
+        `/api/redis/keys?connectionId=${activeConnection.id}&pattern=${encodeURIComponent(pattern)}`,
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to fetch keys")
+      }
+
+      const data = await response.json()
+      setKeys(data.keys || [])
+      applyFilters(data.keys || [], currentSearchTerm, currentFilters)
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch keys")
+      toast({
+        title: "Error",
+        description: err.message || "Failed to fetch keys",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchKeyData = async (key: string) => {
+    if (!activeConnection?.isConnected) return
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const keyType = keys.find((k) => k.key === key)?.type
+      const response = await fetch(
+        `/api/redis/key?connectionId=${activeConnection.id}&key=${encodeURIComponent(key)}${keyType ? `&type=${keyType}` : ""}`,
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to fetch key data")
+      }
+
+      const data = await response.json()
+      setKeyData(data.value)
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch key data")
+      toast({
+        title: "Error",
+        description: err.message || "Failed to fetch key data",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleKeySelect = (key: string) => {
     setSelectedKey(key)
-    setKeyData(mockKeyData[key])
     setIsEditing(false)
+  }
+
+  const handleRefresh = () => {
+    fetchKeys()
+    if (selectedKey) {
+      fetchKeyData(selectedKey)
+    }
+  }
+
+  const handleSaveKey = async (data: any) => {
+    if (!activeConnection?.isConnected || !selectedKey) return
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const keyType = keys.find((k) => k.key === selectedKey)?.type
+
+      const response = await fetch("/api/redis/key", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          connectionId: activeConnection.id,
+          key: selectedKey,
+          value: data,
+          type: keyType,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to save key")
+      }
+
+      setKeyData(data)
+      setIsEditing(false)
+      toast({
+        title: "Success",
+        description: "Key updated successfully",
+      })
+    } catch (err: any) {
+      setError(err.message || "Failed to save key")
+      toast({
+        title: "Error",
+        description: err.message || "Failed to save key",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteKey = async () => {
+    if (!activeConnection?.isConnected || !selectedKey) return
+
+    if (!confirm(`Are you sure you want to delete the key "${selectedKey}"?`)) {
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(
+        `/api/redis/key?connectionId=${activeConnection.id}&key=${encodeURIComponent(selectedKey)}`,
+        {
+          method: "DELETE",
+        },
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete key")
+      }
+
+      // Remove from keys list
+      const updatedKeys = keys.filter((k) => k.key !== selectedKey)
+      setKeys(updatedKeys)
+      applyFilters(updatedKeys, currentSearchTerm, currentFilters)
+
+      // Clear selection
+      setSelectedKey(null)
+      setKeyData(null)
+
+      toast({
+        title: "Success",
+        description: "Key deleted successfully",
+      })
+    } catch (err: any) {
+      setError(err.message || "Failed to delete key")
+      toast({
+        title: "Error",
+        description: err.message || "Failed to delete key",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const applyFilters = (allKeys: KeyInfo[], searchTerm: string, filters: SearchFilter) => {
@@ -214,10 +308,12 @@ export function DataBrowser() {
           <EnhancedSearch onSearch={handleSearch} />
         </div>
         <div className="flex items-center justify-between p-2 border-b border-border">
-          <span className="text-xs font-medium text-muted-foreground px-2">{filteredKeys.length} KEYS</span>
+          <span className="text-xs font-medium text-muted-foreground px-2">
+            {isLoading ? "Loading..." : `${filteredKeys.length} KEYS`}
+          </span>
           <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7">
-              <RefreshCw className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefresh} disabled={isLoading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
             </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7">
               <Plus className="h-3.5 w-3.5" />
@@ -225,6 +321,13 @@ export function DataBrowser() {
           </div>
         </div>
         <div className="flex-1 overflow-auto">
+          {error && (
+            <div className="p-4 text-sm text-red-500 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              {error}
+            </div>
+          )}
+
           {filteredKeys.map((key) => (
             <div
               key={key.key}
@@ -250,6 +353,10 @@ export function DataBrowser() {
               <div className="text-xs text-muted-foreground">{key.size}</div>
             </div>
           ))}
+
+          {!isLoading && filteredKeys.length === 0 && (
+            <div className="p-4 text-center text-muted-foreground">No keys found</div>
+          )}
         </div>
       </div>
 
@@ -277,83 +384,108 @@ export function DataBrowser() {
                 </div>
               </div>
               <div className="flex gap-1">
-                <Button variant="ghost" size="sm" className="h-8">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      typeof keyData === "object" ? JSON.stringify(keyData) : String(keyData),
+                    )
+                    toast({
+                      title: "Copied",
+                      description: "Key value copied to clipboard",
+                    })
+                  }}
+                >
                   <Copy className="h-4 w-4 mr-2" />
                   Copy
                 </Button>
-                <Button variant="ghost" size="sm" className="h-8" onClick={() => setIsEditing(!isEditing)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => setIsEditing(!isEditing)}
+                  disabled={isLoading}
+                >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </Button>
-                <Button variant="ghost" size="sm" className="h-8 text-red-500 hover:text-red-400">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-red-500 hover:text-red-400"
+                  onClick={handleDeleteKey}
+                  disabled={isLoading}
+                >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete
                 </Button>
               </div>
             </div>
 
-            {isEditing ? (
+            {isLoading && (
+              <div className="flex-1 flex items-center justify-center">
+                <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {!isLoading && isEditing ? (
               <div className="flex-1 p-4">
-                <KeyValueEditor
-                  data={keyData}
-                  onSave={(data) => {
-                    console.log("Saving data:", data)
-                    setKeyData(data)
-                    setIsEditing(false)
-                  }}
-                  onCancel={() => setIsEditing(false)}
-                />
+                <KeyValueEditor data={keyData} onSave={handleSaveKey} onCancel={() => setIsEditing(false)} />
               </div>
             ) : (
-              <div className="flex-1 p-4">
-                <Tabs value={viewMode} onValueChange={setViewMode} className="h-full flex flex-col">
-                  <TabsList className="mb-4">
-                    <TabsTrigger value="table">Table View</TabsTrigger>
-                    <TabsTrigger value="json">JSON View</TabsTrigger>
-                    <TabsTrigger value="text">Text View</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="table" className="flex-1 m-0">
-                    <div className="border border-border rounded-md overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="hover:bg-transparent border-border">
-                            <TableHead className="text-muted-foreground">Key</TableHead>
-                            <TableHead className="text-muted-foreground">Value</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {typeof keyData === "object" && keyData !== null ? (
-                            Object.entries(keyData).map(([key, value]) => (
-                              <TableRow key={key} className="border-border">
-                                <TableCell className="font-mono">{key}</TableCell>
-                                <TableCell className="font-mono">
-                                  {typeof value === "object"
-                                    ? JSON.stringify(value).substring(0, 100) +
-                                      (JSON.stringify(value).length > 100 ? "..." : "")
-                                    : String(value)}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          ) : (
-                            <TableRow className="border-border">
-                              <TableCell className="font-mono">value</TableCell>
-                              <TableCell className="font-mono">{String(keyData)}</TableCell>
+              !isLoading && (
+                <div className="flex-1 p-4">
+                  <Tabs value={viewMode} onValueChange={setViewMode} className="h-full flex flex-col">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="table">Table View</TabsTrigger>
+                      <TabsTrigger value="json">JSON View</TabsTrigger>
+                      <TabsTrigger value="text">Text View</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="table" className="flex-1 m-0">
+                      <div className="border border-border rounded-md overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="hover:bg-transparent border-border">
+                              <TableHead className="text-muted-foreground">Key</TableHead>
+                              <TableHead className="text-muted-foreground">Value</TableHead>
                             </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="json" className="flex-1 m-0">
-                    <JsonViewer data={keyData} />
-                  </TabsContent>
-                  <TabsContent value="text" className="flex-1 m-0">
-                    <div className="bg-card border border-border rounded-md p-4 font-mono text-sm whitespace-pre-wrap h-full overflow-auto">
-                      {typeof keyData === "object" ? JSON.stringify(keyData, null, 2) : String(keyData)}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
+                          </TableHeader>
+                          <TableBody>
+                            {typeof keyData === "object" && keyData !== null ? (
+                              Object.entries(keyData).map(([key, value]) => (
+                                <TableRow key={key} className="border-border">
+                                  <TableCell className="font-mono">{key}</TableCell>
+                                  <TableCell className="font-mono">
+                                    {typeof value === "object"
+                                      ? JSON.stringify(value).substring(0, 100) +
+                                        (JSON.stringify(value).length > 100 ? "..." : "")
+                                      : String(value)}
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <TableRow className="border-border">
+                                <TableCell className="font-mono">value</TableCell>
+                                <TableCell className="font-mono">{String(keyData)}</TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="json" className="flex-1 m-0">
+                      <JsonViewer data={keyData} />
+                    </TabsContent>
+                    <TabsContent value="text" className="flex-1 m-0">
+                      <div className="bg-card border border-border rounded-md p-4 font-mono text-sm whitespace-pre-wrap h-full overflow-auto">
+                        {typeof keyData === "object" ? JSON.stringify(keyData, null, 2) : String(keyData)}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              )
             )}
           </>
         ) : (

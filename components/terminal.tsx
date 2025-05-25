@@ -9,49 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Database, ArrowRight, Trash2 } from "lucide-react"
 
-// Mock Redis commands
-const mockCommands: Record<string, (args: string[]) => any> = {
-  ping: () => "PONG",
-  echo: (args) => args.join(" "),
-  get: (args) => {
-    const key = args[0]
-    const mockData = {
-      "user:1000": JSON.stringify({
-        id: 1000,
-        username: "johndoe",
-        email: "john@example.com",
-      }),
-      "session:abc123": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-      counter: "42",
-    }
-    return mockData[key] || "(nil)"
-  },
-  set: (args) => "OK",
-  del: (args) => args.length.toString(),
-  keys: (args) => {
-    const pattern = args[0]
-    const allKeys = [
-      "user:1000",
-      "user:1001",
-      "user:1002",
-      "session:abc123",
-      "session:def456",
-      "products",
-      "counter",
-      "config:app",
-    ]
-    if (pattern === "*") return allKeys
-    return allKeys.filter((key) => key.includes(pattern.replace("*", "")))
-  },
-  info: () =>
-    "# Server\nredis_version:7.0.5\nredis_mode:standalone\n# Clients\nconnected_clients:1\n# Memory\nused_memory_human:1.04M\n# Stats\ntotal_connections_received:1\ntotal_commands_processed:10",
-  help: () => "Try these commands: PING, ECHO, GET, SET, DEL, KEYS, INFO",
-}
-
 type CommandResult = {
   command: string
   result: any
   timestamp: Date
+  error?: boolean
 }
 
 export function Terminal() {
@@ -60,6 +22,7 @@ export function Terminal() {
   const [history, setHistory] = useState<CommandResult[]>([])
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
+  const [isLoading, setIsLoading] = useState(false)
   const terminalEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -68,30 +31,63 @@ export function Terminal() {
     }
   }, [history])
 
-  const executeCommand = () => {
-    if (!command.trim()) return
+  const executeCommand = async () => {
+    if (!command.trim() || !activeConnection?.isConnected) return
 
     // Add to command history
     setCommandHistory([...commandHistory, command])
     setHistoryIndex(-1)
 
-    const parts = command.trim().split(/\s+/)
-    const cmd = parts[0].toLowerCase()
-    const args = parts.slice(1)
+    setIsLoading(true)
 
-    let result
-    if (mockCommands[cmd]) {
-      try {
-        result = mockCommands[cmd](args)
-      } catch (error) {
-        result = `(error) ERR ${error}`
+    try {
+      const response = await fetch("/api/redis/command", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          connectionId: activeConnection.id,
+          command: command.trim(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setHistory([
+          ...history,
+          {
+            command,
+            result: data.error || "Command execution failed",
+            timestamp: new Date(),
+            error: true,
+          },
+        ])
+      } else {
+        setHistory([
+          ...history,
+          {
+            command,
+            result: data.result,
+            timestamp: new Date(),
+          },
+        ])
       }
-    } else {
-      result = `(error) ERR unknown command '${cmd}'`
+    } catch (error: any) {
+      setHistory([
+        ...history,
+        {
+          command,
+          result: error.message || "Command execution failed",
+          timestamp: new Date(),
+          error: true,
+        },
+      ])
+    } finally {
+      setCommand("")
+      setIsLoading(false)
     }
-
-    setHistory([...history, { command, result, timestamp: new Date() }])
-    setCommand("")
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -121,19 +117,25 @@ export function Terminal() {
     setHistory([])
   }
 
-  const formatResult = (result: any) => {
+  const formatResult = (result: any, isError = false) => {
+    if (isError) {
+      return <span className="text-red-500">(error) {String(result)}</span>
+    }
+
     if (Array.isArray(result)) {
       return (
         <div className="pl-4">
           {result.map((item, index) => (
             <div key={index} className="text-green-400">
-              {index + 1}) "{item}"
+              {index + 1}) "{String(item)}"
             </div>
           ))}
         </div>
       )
     } else if (typeof result === "string" && result.includes("\n")) {
       return <pre className="whitespace-pre-wrap text-green-400 pl-4">{result}</pre>
+    } else if (result === null) {
+      return <span className="text-muted-foreground">(nil)</span>
     } else {
       return <span className="text-green-400">{JSON.stringify(result)}</span>
     }
@@ -187,7 +189,7 @@ export function Terminal() {
                 <ArrowRight className="h-3 w-3 mx-2" />
                 <span className="text-red-400">{item.command}</span>
               </div>
-              <div className="pl-6">{formatResult(item.result)}</div>
+              <div className="pl-6">{formatResult(item.result, item.error)}</div>
             </div>
           ))
         )}
@@ -203,10 +205,15 @@ export function Terminal() {
           onKeyDown={handleKeyDown}
           placeholder="Type Redis command..."
           className="flex-1 bg-input font-mono"
+          disabled={isLoading}
           autoFocus
         />
-        <Button onClick={executeCommand} className="ml-2 bg-red-500 hover:bg-red-600">
-          Execute
+        <Button
+          onClick={executeCommand}
+          className="ml-2 bg-red-500 hover:bg-red-600"
+          disabled={isLoading || !command.trim()}
+        >
+          {isLoading ? "Executing..." : "Execute"}
         </Button>
       </div>
     </div>
