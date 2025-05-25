@@ -7,11 +7,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Plus, Trash2, Edit, Copy, Clock, Database, AlertCircle } from "lucide-react"
+import {
+  RefreshCw,
+  Plus,
+  Trash2,
+  Edit,
+  Copy,
+  Clock,
+  Database,
+  AlertCircle,
+  ChevronRight,
+  ChevronDown,
+  Folder,
+  FolderOpen,
+} from "lucide-react"
 import { KeyValueEditor } from "@/components/key-value-editor"
 import { JsonViewer } from "@/components/json-viewer"
 import { EnhancedSearch } from "@/components/enhanced-search"
 import { toast } from "@/components/ui/use-toast"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 type KeyInfo = {
   key: string
@@ -26,10 +41,22 @@ type SearchFilter = {
   pattern?: "exact" | "prefix" | "contains" | "regex"
 }
 
+type TreeNode = {
+  name: string
+  path: string
+  isKey: boolean
+  type?: string
+  ttl?: number
+  size?: string
+  children: Map<string, TreeNode>
+  expanded?: boolean
+}
+
 export function DataBrowser() {
   const { activeConnection } = useConnection()
   const [keys, setKeys] = useState<KeyInfo[]>([])
-  const [filteredKeys, setFilteredKeys] = useState<KeyInfo[]>([])
+  const [treeData, setTreeData] = useState<TreeNode | null>(null)
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [keyData, setKeyData] = useState<any>(null)
   const [viewMode, setViewMode] = useState("table")
@@ -38,6 +65,53 @@ export function DataBrowser() {
   const [currentFilters, setCurrentFilters] = useState<SearchFilter>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [delimiter, setDelimiter] = useState(":")
+
+  // Build tree structure from keys
+  const buildTree = (keys: KeyInfo[]): TreeNode => {
+    const root: TreeNode = {
+      name: "root",
+      path: "",
+      isKey: false,
+      children: new Map(),
+    }
+
+    keys.forEach((keyInfo) => {
+      const parts = keyInfo.key.split(delimiter)
+      let currentNode = root
+
+      parts.forEach((part, index) => {
+        const isLastPart = index === parts.length - 1
+        const currentPath = parts.slice(0, index + 1).join(delimiter)
+
+        if (!currentNode.children.has(part)) {
+          currentNode.children.set(part, {
+            name: part,
+            path: currentPath,
+            isKey: isLastPart,
+            type: isLastPart ? keyInfo.type : undefined,
+            ttl: isLastPart ? keyInfo.ttl : undefined,
+            size: isLastPart ? keyInfo.size : undefined,
+            children: new Map(),
+          })
+        }
+
+        currentNode = currentNode.children.get(part)!
+      })
+    })
+
+    return root
+  }
+
+  // Update tree when keys change
+  useEffect(() => {
+    if (keys.length > 0) {
+      const tree = buildTree(keys)
+      setTreeData(tree)
+    } else {
+      setTreeData(null)
+    }
+  }, [keys, delimiter])
 
   // Fetch keys when connection changes
   useEffect(() => {
@@ -45,7 +119,7 @@ export function DataBrowser() {
       fetchKeys()
     } else {
       setKeys([])
-      setFilteredKeys([])
+      setTreeData(null)
       setSelectedKey(null)
       setKeyData(null)
     }
@@ -76,7 +150,6 @@ export function DataBrowser() {
 
       const data = await response.json()
       setKeys(data.keys || [])
-      applyFilters(data.keys || [], currentSearchTerm, currentFilters)
     } catch (err: any) {
       setError(err.message || "Failed to fetch keys")
       toast({
@@ -203,7 +276,6 @@ export function DataBrowser() {
       // Remove from keys list
       const updatedKeys = keys.filter((k) => k.key !== selectedKey)
       setKeys(updatedKeys)
-      applyFilters(updatedKeys, currentSearchTerm, currentFilters)
 
       // Clear selection
       setSelectedKey(null)
@@ -225,51 +297,23 @@ export function DataBrowser() {
     }
   }
 
-  const applyFilters = (allKeys: KeyInfo[], searchTerm: string, filters: SearchFilter) => {
-    let result = [...allKeys]
-
-    // Apply search term
-    if (searchTerm) {
-      const pattern = filters.pattern || "contains"
-
-      if (pattern === "exact") {
-        result = result.filter((k) => k.key === searchTerm)
-      } else if (pattern === "prefix") {
-        result = result.filter((k) => k.key.startsWith(searchTerm))
-      } else if (pattern === "contains") {
-        result = result.filter((k) => k.key.includes(searchTerm))
-      } else if (pattern === "regex") {
-        try {
-          const regex = new RegExp(searchTerm)
-          result = result.filter((k) => regex.test(k.key))
-        } catch (e) {
-          // Invalid regex, fall back to contains
-          result = result.filter((k) => k.key.includes(searchTerm))
-        }
-      }
+  const toggleNode = (path: string) => {
+    const newExpanded = new Set(expandedNodes)
+    if (newExpanded.has(path)) {
+      newExpanded.delete(path)
+    } else {
+      newExpanded.add(path)
     }
-
-    // Apply type filter
-    if (filters.type) {
-      result = result.filter((k) => k.type === filters.type)
-    }
-
-    // Apply TTL filter
-    if (filters.ttl) {
-      if (filters.ttl === "with-expiry") {
-        result = result.filter((k) => k.ttl > 0)
-      } else if (filters.ttl === "no-expiry") {
-        result = result.filter((k) => k.ttl === -1)
-      }
-    }
-
-    setFilteredKeys(result)
-    setCurrentSearchTerm(searchTerm)
-    setCurrentFilters(filters)
+    setExpandedNodes(newExpanded)
   }
 
   const handleSearch = (searchTerm: string, filters: SearchFilter) => {
-    applyFilters(keys, searchTerm, filters)
+    setCurrentSearchTerm(searchTerm)
+    setCurrentFilters(filters)
+
+    // Fetch keys with search pattern
+    const pattern = searchTerm || "*"
+    fetchKeys(pattern)
   }
 
   const getTypeColor = (type: string) => {
@@ -282,6 +326,72 @@ export function DataBrowser() {
       json: "bg-pink-500/10 text-pink-500 border-pink-500/20",
     }
     return colors[type] || "bg-gray-500/10 text-gray-400 border-gray-500/20"
+  }
+
+  const renderTreeNode = (node: TreeNode, level = 0) => {
+    const isExpanded = expandedNodes.has(node.path)
+    const hasChildren = node.children.size > 0
+
+    if (node.isKey) {
+      return (
+        <div
+          key={node.path}
+          className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted/50 ${
+            selectedKey === node.path ? "bg-muted" : ""
+          }`}
+          style={{ paddingLeft: `${level * 20 + 12}px` }}
+          onClick={() => handleKeySelect(node.path)}
+        >
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="font-mono text-sm truncate">{node.name}</div>
+            <Badge variant="outline" className={getTypeColor(node.type || "")}>
+              {node.type}
+            </Badge>
+            {node.ttl && node.ttl > 0 && (
+              <div className="flex items-center text-xs text-muted-foreground">
+                <Clock className="h-3 w-3 mr-1" />
+                {node.ttl}s
+              </div>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground">{node.size}</div>
+        </div>
+      )
+    }
+
+    return (
+      <div key={node.path}>
+        {node.path && (
+          <div
+            className="flex items-center px-3 py-2 cursor-pointer hover:bg-muted/50"
+            style={{ paddingLeft: `${level * 20 + 12}px` }}
+            onClick={() => toggleNode(node.path)}
+          >
+            <button className="mr-1 text-muted-foreground hover:text-foreground">
+              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+            {isExpanded ? (
+              <FolderOpen className="h-4 w-4 mr-2 text-yellow-500" />
+            ) : (
+              <Folder className="h-4 w-4 mr-2 text-yellow-500" />
+            )}
+            <span className="font-medium text-sm">{node.name}</span>
+            <span className="ml-2 text-xs text-muted-foreground">({node.children.size})</span>
+          </div>
+        )}
+        {(isExpanded || !node.path) && (
+          <div>
+            {Array.from(node.children.values())
+              .sort((a, b) => {
+                // Sort folders first, then keys
+                if (a.isKey === b.isKey) return a.name.localeCompare(b.name)
+                return a.isKey ? 1 : -1
+              })
+              .map((child) => renderTreeNode(child, node.path ? level + 1 : level))}
+          </div>
+        )}
+      </div>
+    )
   }
 
   if (!activeConnection?.isConnected) {
@@ -306,10 +416,23 @@ export function DataBrowser() {
       <div className="w-80 border-r border-border flex flex-col">
         <div className="p-4 border-b border-border">
           <EnhancedSearch onSearch={handleSearch} />
+          <div className="mt-2 flex items-center gap-2">
+            <Label htmlFor="delimiter" className="text-xs text-muted-foreground">
+              Delimiter:
+            </Label>
+            <Input
+              id="delimiter"
+              type="text"
+              value={delimiter}
+              onChange={(e) => setDelimiter(e.target.value || ":")}
+              className="h-7 w-16 text-xs"
+              placeholder=":"
+            />
+          </div>
         </div>
         <div className="flex items-center justify-between p-2 border-b border-border">
           <span className="text-xs font-medium text-muted-foreground px-2">
-            {isLoading ? "Loading..." : `${filteredKeys.length} KEYS`}
+            {isLoading ? "Loading..." : `${keys.length} KEYS`}
           </span>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefresh} disabled={isLoading}>
@@ -328,33 +451,9 @@ export function DataBrowser() {
             </div>
           )}
 
-          {filteredKeys.map((key) => (
-            <div
-              key={key.key}
-              className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 ${
-                selectedKey === key.key ? "bg-muted" : ""
-              }`}
-              onClick={() => handleKeySelect(key.key)}
-            >
-              <div className="overflow-hidden">
-                <div className="font-mono text-sm truncate">{key.key}</div>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="outline" className={getTypeColor(key.type)}>
-                    {key.type}
-                  </Badge>
-                  {key.ttl > 0 && (
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {key.ttl}s
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground">{key.size}</div>
-            </div>
-          ))}
+          {treeData && renderTreeNode(treeData)}
 
-          {!isLoading && filteredKeys.length === 0 && (
+          {!isLoading && keys.length === 0 && (
             <div className="p-4 text-center text-muted-foreground">No keys found</div>
           )}
         </div>
