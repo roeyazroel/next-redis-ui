@@ -14,9 +14,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Redis connection not found" }, { status: 404 })
     }
 
-    const result = await executeCommand(client, command)
-
-    return NextResponse.json({ result })
+    try {
+      const result = await executeCommand(client, command)
+      return NextResponse.json({ result })
+    } catch (error: any) {
+      console.error(`Error executing command ${command}:`, error)
+      return NextResponse.json({ error: error.message || "Command execution failed" }, { status: 500 })
+    }
   } catch (error: any) {
     console.error("Error executing Redis command:", error)
     return NextResponse.json({ error: error.message || "Failed to execute Redis command" }, { status: 500 })

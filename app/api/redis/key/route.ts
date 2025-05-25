@@ -17,9 +17,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Redis connection not found" }, { status: 404 })
     }
 
-    const value = await getKeyValue(client, key, type || undefined)
-
-    return NextResponse.json({ value })
+    try {
+      const value = await getKeyValue(client, key, type || undefined)
+      return NextResponse.json({ value })
+    } catch (error: any) {
+      console.error(`Error getting value for key ${key}:`, error)
+      return NextResponse.json({ error: error.message || `Failed to get value for key ${key}` }, { status: 500 })
+    }
   } catch (error: any) {
     console.error("Error fetching Redis key value:", error)
     return NextResponse.json({ error: error.message || "Failed to fetch Redis key value" }, { status: 500 })

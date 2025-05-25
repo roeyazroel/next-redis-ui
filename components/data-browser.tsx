@@ -66,6 +66,7 @@ export function DataBrowser() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [delimiter, setDelimiter] = useState(":")
+  const [retryCount, setRetryCount] = useState(0)
 
   // Build tree structure from keys
   const buildTree = (keys: KeyInfo[]): TreeNode => {
@@ -94,6 +95,13 @@ export function DataBrowser() {
             size: isLastPart ? keyInfo.size : undefined,
             children: new Map(),
           })
+        } else if (isLastPart) {
+          // Update existing node with key info
+          const existingNode = currentNode.children.get(part)!
+          existingNode.isKey = true
+          existingNode.type = keyInfo.type
+          existingNode.ttl = keyInfo.ttl
+          existingNode.size = keyInfo.size
         }
 
         currentNode = currentNode.children.get(part)!
@@ -150,11 +158,26 @@ export function DataBrowser() {
 
       const data = await response.json()
       setKeys(data.keys || [])
+      setRetryCount(0) // Reset retry count on success
     } catch (err: any) {
-      setError(err.message || "Failed to fetch keys")
+      const errorMsg = err.message || "Failed to fetch keys"
+      setError(errorMsg)
+
+      // If we get a 404, the connection might be lost
+      if (err.message.includes("404") && retryCount < 3) {
+        console.warn(`Connection may be lost, retrying (${retryCount + 1}/3)...`)
+        setRetryCount((prev) => prev + 1)
+
+        // Wait a bit and retry
+        setTimeout(() => {
+          fetchKeys(pattern)
+        }, 1000)
+        return
+      }
+
       toast({
         title: "Error",
-        description: err.message || "Failed to fetch keys",
+        description: errorMsg,
         variant: "destructive",
       })
     } finally {
@@ -169,9 +192,13 @@ export function DataBrowser() {
     setError(null)
 
     try {
-      const keyType = keys.find((k) => k.key === key)?.type
+      const keyInfo = keys.find((k) => k.key === key)
+      if (!keyInfo) {
+        throw new Error(`Key information not found for ${key}`)
+      }
+
       const response = await fetch(
-        `/api/redis/key?connectionId=${activeConnection.id}&key=${encodeURIComponent(key)}${keyType ? `&type=${keyType}` : ""}`,
+        `/api/redis/key?connectionId=${activeConnection.id}&key=${encodeURIComponent(key)}&type=${keyInfo.type}`,
       )
 
       if (!response.ok) {
@@ -182,10 +209,11 @@ export function DataBrowser() {
       const data = await response.json()
       setKeyData(data.value)
     } catch (err: any) {
-      setError(err.message || "Failed to fetch key data")
+      const errorMsg = err.message || "Failed to fetch key data"
+      setError(errorMsg)
       toast({
         title: "Error",
-        description: err.message || "Failed to fetch key data",
+        description: errorMsg,
         variant: "destructive",
       })
     } finally {
@@ -199,7 +227,7 @@ export function DataBrowser() {
   }
 
   const handleRefresh = () => {
-    fetchKeys()
+    fetchKeys(currentSearchTerm || "*")
     if (selectedKey) {
       fetchKeyData(selectedKey)
     }
@@ -212,7 +240,10 @@ export function DataBrowser() {
     setError(null)
 
     try {
-      const keyType = keys.find((k) => k.key === selectedKey)?.type
+      const keyInfo = keys.find((k) => k.key === selectedKey)
+      if (!keyInfo) {
+        throw new Error(`Key information not found for ${selectedKey}`)
+      }
 
       const response = await fetch("/api/redis/key", {
         method: "POST",
@@ -223,7 +254,7 @@ export function DataBrowser() {
           connectionId: activeConnection.id,
           key: selectedKey,
           value: data,
-          type: keyType,
+          type: keyInfo.type,
         }),
       })
 
@@ -239,10 +270,11 @@ export function DataBrowser() {
         description: "Key updated successfully",
       })
     } catch (err: any) {
-      setError(err.message || "Failed to save key")
+      const errorMsg = err.message || "Failed to save key"
+      setError(errorMsg)
       toast({
         title: "Error",
-        description: err.message || "Failed to save key",
+        description: errorMsg,
         variant: "destructive",
       })
     } finally {
@@ -286,10 +318,11 @@ export function DataBrowser() {
         description: "Key deleted successfully",
       })
     } catch (err: any) {
-      setError(err.message || "Failed to delete key")
+      const errorMsg = err.message || "Failed to delete key"
+      setError(errorMsg)
       toast({
         title: "Error",
-        description: err.message || "Failed to delete key",
+        description: errorMsg,
         variant: "destructive",
       })
     } finally {
@@ -312,7 +345,16 @@ export function DataBrowser() {
     setCurrentFilters(filters)
 
     // Fetch keys with search pattern
-    const pattern = searchTerm || "*"
+    const pattern = searchTerm
+      ? filters.pattern === "exact"
+        ? searchTerm
+        : filters.pattern === "prefix"
+          ? `${searchTerm}*`
+          : filters.pattern === "regex"
+            ? searchTerm
+            : `*${searchTerm}*`
+      : "*"
+
     fetchKeys(pattern)
   }
 
@@ -344,9 +386,11 @@ export function DataBrowser() {
         >
           <div className="flex items-center gap-2 overflow-hidden">
             <div className="font-mono text-sm truncate">{node.name}</div>
-            <Badge variant="outline" className={getTypeColor(node.type || "")}>
-              {node.type}
-            </Badge>
+            {node.type && (
+              <Badge variant="outline" className={getTypeColor(node.type)}>
+                {node.type}
+              </Badge>
+            )}
             {node.ttl && node.ttl > 0 && (
               <div className="flex items-center text-xs text-muted-foreground">
                 <Clock className="h-3 w-3 mr-1" />
@@ -448,13 +492,22 @@ export function DataBrowser() {
             <div className="p-4 text-sm text-red-500 flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
               {error}
+              <Button variant="ghost" size="sm" className="ml-auto h-6 px-2 text-xs" onClick={handleRefresh}>
+                Retry
+              </Button>
             </div>
           )}
 
           {treeData && renderTreeNode(treeData)}
 
-          {!isLoading && keys.length === 0 && (
+          {!isLoading && !error && keys.length === 0 && (
             <div className="p-4 text-center text-muted-foreground">No keys found</div>
+          )}
+
+          {isLoading && keys.length === 0 && (
+            <div className="p-4 flex justify-center">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
           )}
         </div>
       </div>
@@ -529,12 +582,26 @@ export function DataBrowser() {
               </div>
             )}
 
-            {!isLoading && isEditing ? (
+            {error && !isLoading && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+                  <h3 className="text-xl font-medium mb-2">Error</h3>
+                  <p className="text-muted-foreground mb-4">{error}</p>
+                  <Button onClick={() => fetchKeyData(selectedKey)} className="bg-red-500 hover:bg-red-600">
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!isLoading && !error && isEditing ? (
               <div className="flex-1 p-4">
                 <KeyValueEditor data={keyData} onSave={handleSaveKey} onCancel={() => setIsEditing(false)} />
               </div>
             ) : (
-              !isLoading && (
+              !isLoading &&
+              !error && (
                 <div className="flex-1 p-4">
                   <Tabs value={viewMode} onValueChange={setViewMode} className="h-full flex flex-col">
                     <TabsList className="mb-4">

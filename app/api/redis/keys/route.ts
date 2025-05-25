@@ -21,23 +21,28 @@ export async function GET(request: NextRequest) {
 
     // Get additional info for each key
     const keyInfoPromises = keys.map(async (key) => {
-      const [type, ttl, memoryUsage] = await Promise.all([
-        getKeyType(client!, key),
-        getKeyTTL(client!, key),
-        getKeyMemoryUsage(client!, key).catch(() => 0), // Memory usage might not be available
-      ])
+      try {
+        const [type, ttl, memoryUsage] = await Promise.all([
+          getKeyType(client!, key),
+          getKeyTTL(client!, key),
+          getKeyMemoryUsage(client!, key).catch(() => 0), // Memory usage might not be available
+        ])
 
-      // Format memory size
-      let size = ""
-      if (memoryUsage < 1024) {
-        size = `${memoryUsage} B`
-      } else if (memoryUsage < 1024 * 1024) {
-        size = `${(memoryUsage / 1024).toFixed(1)} KB`
-      } else {
-        size = `${(memoryUsage / (1024 * 1024)).toFixed(1)} MB`
+        // Format memory size
+        let size = ""
+        if (memoryUsage < 1024) {
+          size = `${memoryUsage} B`
+        } else if (memoryUsage < 1024 * 1024) {
+          size = `${(memoryUsage / 1024).toFixed(1)} KB`
+        } else {
+          size = `${(memoryUsage / (1024 * 1024)).toFixed(1)} MB`
+        }
+
+        return { key, type, ttl, size }
+      } catch (error) {
+        console.error(`Error getting info for key ${key}:`, error)
+        return { key, type: "unknown", ttl: -1, size: "0 B" }
       }
-
-      return { key, type, ttl, size }
     })
 
     const keyInfo = await Promise.all(keyInfoPromises)

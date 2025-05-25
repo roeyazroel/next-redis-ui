@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { toast } from "@/components/ui/use-toast"
 
 type Connection = {
   id: string
@@ -63,8 +64,36 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
     const connected = savedConnections.find((conn) => conn.isConnected)
     if (connected) {
       setActiveConnectionState(connected)
+
+      // Verify the connection is still active
+      verifyConnection(connected.id)
     }
   }, [])
+
+  // Verify a connection is still active
+  const verifyConnection = async (id: string) => {
+    try {
+      const connection = connections.find((conn) => conn.id === id)
+      if (!connection) return
+
+      // Try to fetch keys as a connection test
+      const response = await fetch(`/api/redis/keys?connectionId=${id}&pattern=*`)
+
+      if (!response.ok) {
+        // If connection failed, update the connection status
+        console.warn(`Connection ${connection.name} is no longer active`)
+        const updatedConnections = connections.map((conn) => (conn.id === id ? { ...conn, isConnected: false } : conn))
+        setConnections(updatedConnections)
+        saveConnections(updatedConnections)
+
+        if (activeConnection?.id === id) {
+          setActiveConnectionState(null)
+        }
+      }
+    } catch (error) {
+      console.error(`Error verifying connection ${id}:`, error)
+    }
+  }
 
   const addConnection = async (connection: Omit<Connection, "id" | "isConnected">) => {
     setIsLoading(true)
@@ -81,9 +110,20 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
       setConnections(updatedConnections)
       saveConnections(updatedConnections)
 
+      toast({
+        title: "Connection Added",
+        description: `${newConnection.name} has been added successfully`,
+      })
+
       return
     } catch (err: any) {
-      setError(err.message || "Failed to add connection")
+      const errorMsg = err.message || "Failed to add connection"
+      setError(errorMsg)
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive",
+      })
       throw err
     } finally {
       setIsLoading(false)
@@ -107,8 +147,19 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
       if (activeConnection?.id === id) {
         setActiveConnectionState(null)
       }
+
+      toast({
+        title: "Connection Removed",
+        description: "The connection has been removed successfully",
+      })
     } catch (err: any) {
-      setError(err.message || "Failed to remove connection")
+      const errorMsg = err.message || "Failed to remove connection"
+      setError(errorMsg)
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive",
+      })
       throw err
     } finally {
       setIsLoading(false)
@@ -148,8 +199,19 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
       // Set as active connection
       const updatedConnection = updatedConnections.find((conn) => conn.id === id)!
       setActiveConnectionState(updatedConnection)
+
+      toast({
+        title: "Connected",
+        description: `Successfully connected to ${connection.name}`,
+      })
     } catch (err: any) {
-      setError(err.message || "Failed to connect to Redis")
+      const errorMsg = err.message || "Failed to connect to Redis"
+      setError(errorMsg)
+      toast({
+        title: "Connection Error",
+        description: errorMsg,
+        variant: "destructive",
+      })
       throw err
     } finally {
       setIsLoading(false)
@@ -185,8 +247,19 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
       if (activeConnection?.id === id) {
         setActiveConnectionState(null)
       }
+
+      toast({
+        title: "Disconnected",
+        description: "Successfully disconnected from Redis",
+      })
     } catch (err: any) {
-      setError(err.message || "Failed to disconnect from Redis")
+      const errorMsg = err.message || "Failed to disconnect from Redis"
+      setError(errorMsg)
+      toast({
+        title: "Disconnection Error",
+        description: errorMsg,
+        variant: "destructive",
+      })
       throw err
     } finally {
       setIsLoading(false)
@@ -202,6 +275,13 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
     const connection = connections.find((conn) => conn.id === id)
     if (connection) {
       setActiveConnectionState(connection)
+
+      // If the connection is not connected, try to connect
+      if (!connection.isConnected) {
+        connectToRedis(id).catch((err) => {
+          console.error("Failed to auto-connect:", err)
+        })
+      }
     }
   }
 
