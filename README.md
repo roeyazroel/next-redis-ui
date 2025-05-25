@@ -1,38 +1,158 @@
 # NextRedisUI
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+A modern, feature-rich Redis management interface built with Next.js. NextRedisUI provides an intuitive web-based GUI for managing Redis databases with real-time monitoring, data browsing, and terminal access.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/roeyazroel/v0-modern-redis-ui)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/tMNbLOBn4hD)
+## 🔗 Links
 
-## Overview
+- **Live Demo**: [https://v0-modern-redis-ui.vercel.app/](https://v0-modern-redis-ui.vercel.app/)
 
-NextRedisUI is a modern Redis management interface built with Next.js. It provides a clean, intuitive UI for managing Redis databases, with features like data browsing, terminal access, and monitoring.
 
-## Features
+## 🚀 Features
 
-- **Data Browser**: Browse and edit Redis keys with a tree-like structure
-- **Terminal**: Execute Redis commands directly
-- **Monitoring**: View real-time Redis server statistics
-- **Connection Management**: Manage multiple Redis connections
-- **Resizable Interface**: Customize your workspace with resizable panels
-- **Dark/Light Mode**: Switch between themes based on your preference
+### 📊 Data Browser
 
-## Deployment
+- **Tree View**: Hierarchical key organization with customizable delimiters
+- **Multiple View Modes**: Table, JSON, and text views for data visualization
+- **Advanced Search**: Pattern matching with filters by type, TTL, and more
+- **Key Management**: Create, edit, delete, and copy Redis keys
+- **Type Support**: Full support for all Redis data types (string, hash, list, set, zset, JSON)
 
-Your project is live at:
+### 💻 Redis Terminal
 
-**[https://vercel.com/roeyazroel/v0-modern-redis-ui](https://vercel.com/roeyazroel/v0-modern-redis-ui)**
+- **Interactive CLI**: Execute Redis commands directly in the browser
+- **Command History**: Navigate through previous commands with arrow keys
+- **Real-time Results**: Instant command execution with formatted output
+- **Error Handling**: Clear error messages and debugging information
 
-## Build your app
+### 📈 Real-time Monitoring
 
-Continue building your app on:
+- **Server Metrics**: Memory usage, client connections, and performance stats
+- **Auto-refresh**: Configurable real-time data updates
+- **Detailed Analytics**: Hit rates, operations per second, and keyspace statistics
+- **System Information**: Server version, uptime, and configuration details
 
-**[https://v0.dev/chat/projects/tMNbLOBn4hD](https://v0.dev/chat/projects/tMNbLOBn4hD)**
+### 🔗 Connection Management
 
-## How It Works
+- **Multiple Connections**: Manage and switch between multiple Redis instances
+- **Secure Connections**: Support for TLS/SSL and authentication
+- **Connection Persistence**: Saved connections in browser local storage
+- **Quick Connect**: One-click connection switching
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+### 🎨 Modern UI/UX
+
+- **Dark/Light Themes**: Seamless theme switching
+- **Responsive Design**: Works on desktop, tablet, and mobile devices
+- **Command Palette**: Quick navigation with keyboard shortcuts (⌘K)
+- **Resizable Panels**: Customizable workspace layout
+
+## 🛠️ Tech Stack
+
+### Frontend
+
+- **[Next.js 15](https://nextjs.org/)** - React framework with App Router
+- **[React 19](https://react.dev/)** - UI library with latest features
+- **[TypeScript](https://www.typescriptlang.org/)** - Type-safe development
+- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
+- **[Shadcn UI](https://ui.shadcn.com/)** - Accessible component primitives
+- **[Lucide React](https://lucide.dev/)** - Beautiful icon library
+
+### Development Tools
+
+- **[ESLint](https://eslint.org/)** - Code linting
+- **[Prettier](https://prettier.io/)** - Code formatting
+- **[pnpm](https://pnpm.io/)** - Fast, disk space efficient package manager
+
+## 🏃‍♂️ Getting Started
+
+### Prerequisites
+
+- **Node.js** 22.0 or later
+- **pnpm** (recommended) or npm/yarn
+- **Redis Server** (local or remote)
+
+### Local Development
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/roeyazroel/next-redis-ui.git
+   cd next-redis-ui
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   pnpm install
+   ```
+
+3. **Start the development server**
+
+   ```bash
+   pnpm dev
+   ```
+
+4. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+### Production Build
+
+```bash
+# Build the application
+pnpm build
+
+# Start the production server
+pnpm start
+```
+
+### Docker Deployment
+
+```bash
+# Build the Docker image
+docker build -t next-redis-ui .
+
+# Run the container
+docker run -p 3000:3000 next-redis-ui
+```
+
+## 🔧 Configuration
+
+### Redis Connection
+
+NextRedisUI supports various Redis configurations:
+
+- **Standard Redis**: localhost:6379
+- **Redis with Authentication**: username/password
+- **Redis with TLS**: SSL/TLS encrypted connections
+- **Redis Cloud**: Compatible with Redis Cloud, AWS ElastiCache, etc.
+
+## 📱 Usage
+
+1. **Add Connection**: Click "Add Connection" to configure your Redis server
+2. **Connect**: Use the power button to establish connection
+3. **Browse Data**: Navigate keys in the tree view or use advanced search
+4. **Execute Commands**: Use the terminal for direct Redis command execution
+5. **Monitor Performance**: View real-time metrics in the monitoring tab
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [v0.dev](https://v0.dev) and Cursor using vibe coding only
+- Inspired by Redis Desktop Manager, Redis Commander and other Redis GUI tools
+- Thanks to the open-source community for the amazing tools and libraries
+
+---
+
+**NextRedisUI** - Making Redis management simple and beautiful ✨
