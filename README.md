@@ -1,4 +1,4 @@
-# Modern Redis UI
+# NextRedisUI
 
 *Automatically synced with your [v0.dev](https://v0.dev) deployments*
 
@@ -7,8 +7,16 @@
 
 ## Overview
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+NextRedisUI is a modern Redis management interface built with Next.js. It provides a clean, intuitive UI for managing Redis databases, with features like data browsing, terminal access, and monitoring.
+
+## Features
+
+- **Data Browser**: Browse and edit Redis keys with a tree-like structure
+- **Terminal**: Execute Redis commands directly
+- **Monitoring**: View real-time Redis server statistics
+- **Connection Management**: Manage multiple Redis connections
+- **Resizable Interface**: Customize your workspace with resizable panels
+- **Dark/Light Mode**: Switch between themes based on your preference
 
 ## Deployment
 

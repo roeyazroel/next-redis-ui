@@ -5,8 +5,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: "Modern Redis UI",
-  description: "A modern UI for Redis",
+  title: "NextRedisUI",
+  description: "A modern UI for Redis built with Next.js",
   generator: "v0.dev",
 }
 

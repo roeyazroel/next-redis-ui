@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ConnectionPanel } from "@/components/connection-panel"
 import { DataBrowser } from "@/components/data-browser"
 import { Sidebar } from "@/components/sidebar"
@@ -15,6 +15,19 @@ import { Button } from "@/components/ui/button"
 export function RedisUI() {
   const [activeTab, setActiveTab] = useState("browser")
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+
+  // Add event listener for opening connections tab
+  useEffect(() => {
+    const handleOpenConnectionsTab = () => {
+      setActiveTab("connections")
+    }
+
+    window.addEventListener("open-connections-tab", handleOpenConnectionsTab)
+
+    return () => {
+      window.removeEventListener("open-connections-tab", handleOpenConnectionsTab)
+    }
+  }, [])
 
   return (
     <ConnectionProvider>

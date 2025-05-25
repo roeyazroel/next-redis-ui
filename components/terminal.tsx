@@ -149,7 +149,13 @@ export function Terminal() {
             <Database className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-medium mb-2">No Active Connection</h3>
             <p className="text-muted-foreground mb-4">Connect to a Redis server to use the terminal</p>
-            <Button onClick={() => {}} className="bg-red-500 hover:bg-red-600">
+            <Button
+              onClick={() => {
+                const event = new CustomEvent("open-connections-tab")
+                window.dispatchEvent(event)
+              }}
+              className="bg-red-500 hover:bg-red-600"
+            >
               Connect to Redis
             </Button>
           </div>

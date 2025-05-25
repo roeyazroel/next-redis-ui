@@ -20,7 +20,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       <div className="p-4 border-b border-border">
         <h1 className="text-xl font-bold flex items-center gap-2">
           <Database className="h-5 w-5 text-red-500" />
-          <span className="bg-gradient-to-r from-red-500 to-pink-500 bg-clip-text text-transparent">RedisUI</span>
+          <span className="bg-gradient-to-r from-red-500 to-pink-500 bg-clip-text text-transparent">NextRedisUI</span>
         </h1>
       </div>
 
