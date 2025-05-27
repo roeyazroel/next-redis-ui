@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
+about: Suggest an idea for NextRedisUI
 title: "[FEATURE] "
 labels: "enhancement"
 assignees: ""
@@ -13,6 +13,10 @@ A clear and concise description of what the problem is. Ex. I'm always frustrate
 ## Describe the solution you'd like
 
 A clear and concise description of what you want to happen.
+
+## Use case / Impact
+
+Describe how this feature would help your workflow or improve NextRedisUI.
 
 ## Describe alternatives you've considered
 
