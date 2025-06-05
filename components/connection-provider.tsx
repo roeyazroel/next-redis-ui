@@ -18,6 +18,7 @@ type Connection = {
   password?: string;
   tls?: boolean;
   isConnected: boolean;
+  source?: "environment" | "user";
 };
 
 type ConnectionContextType = {
@@ -60,7 +61,69 @@ const loadConnections = (): Connection[] => {
 // Save connections to localStorage
 const saveConnections = (connections: Connection[]) => {
   if (typeof window === "undefined") return;
-  localStorage.setItem("redis-connections", JSON.stringify(connections));
+  // Only save user connections, not environment ones
+  const userConnections = connections.filter(
+    (conn) => conn.source !== "environment"
+  );
+  localStorage.setItem("redis-connections", JSON.stringify(userConnections));
+};
+
+// Load environment connections from server
+const loadEnvironmentConnections = async (): Promise<Connection[]> => {
+  try {
+    // Call our own API to get environment connection configs
+    const response = await fetch("/api/redis/env-connections");
+    if (!response.ok) {
+      console.warn("No environment connections endpoint available");
+      return [];
+    }
+
+    const envConfigs = await response.json();
+    return envConfigs.map((config: any) => ({
+      ...config,
+      isConnected: false, // Will be updated after connection attempts
+      source: "environment" as const,
+    }));
+  } catch (error) {
+    console.warn("Failed to load environment connections:", error);
+    return [];
+  }
+};
+
+// Merge user and environment connections, giving precedence to environment
+const mergeConnections = (
+  userConnections: Connection[],
+  envConnections: Connection[]
+): Connection[] => {
+  const merged = [...envConnections];
+
+  // Add user connections that don't conflict with environment ones
+  userConnections.forEach((userConn) => {
+    const conflict = envConnections.find(
+      (envConn) =>
+        envConn.host === userConn.host && envConn.port === userConn.port
+    );
+
+    if (!conflict) {
+      merged.push({ ...userConn, source: "user" });
+    } else {
+      console.log(
+        `User connection ${userConn.name} conflicts with environment connection, using environment version`
+      );
+    }
+  });
+
+  return merged;
+};
+
+// Mark connections as environment-sourced
+const markEnvironmentConnections = (
+  connections: Connection[]
+): Connection[] => {
+  return connections.map((conn) => ({
+    ...conn,
+    source: conn.source || "user",
+  }));
 };
 
 export function ConnectionProvider({ children }: { children: ReactNode }) {
@@ -72,17 +135,85 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
 
   // Load saved connections on mount
   useEffect(() => {
-    const savedConnections = loadConnections();
-    setConnections(savedConnections);
+    const initializeConnections = async () => {
+      setIsLoading(true);
 
-    // Set active connection if there's a connected one
-    const connected = savedConnections.find((conn) => conn.isConnected);
-    if (connected) {
-      setActiveConnectionState(connected);
+      try {
+        // Load user connections from localStorage
+        const savedConnections = loadConnections();
 
-      // Verify the connection is still active
-      verifyConnection(connected.id);
-    }
+        // Load environment connections from server
+        const envConnections = await loadEnvironmentConnections();
+
+        // Merge connections with environment taking precedence
+        const mergedConnections = mergeConnections(
+          savedConnections,
+          envConnections
+        );
+
+        console.log(
+          `Loaded ${savedConnections.length} user connections and ${envConnections.length} environment connections`
+        );
+
+        setConnections(mergedConnections);
+
+        // Set active connection if there's a connected one
+        const connected = mergedConnections.find((conn) => conn.isConnected);
+        if (connected) {
+          setActiveConnectionState(connected);
+          // Verify the connection is still active
+          verifyConnection(connected.id);
+        }
+
+        // Auto-connect to environment connections
+        for (const envConn of envConnections) {
+          try {
+            console.log(
+              `Auto-connecting to environment Redis: ${envConn.name}`
+            );
+
+            // Call the API to establish connection
+            const response = await fetch("/api/redis/connect", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                config: envConn,
+                isEnvironmentConnection: true,
+              }),
+            });
+
+            if (response.ok) {
+              // Update the connection state locally
+              envConn.isConnected = true;
+              console.log(`✓ Successfully auto-connected to ${envConn.name}`);
+
+              // Set as active connection if it's the first one
+              if (!connected) {
+                setActiveConnectionState(envConn);
+              }
+            } else {
+              console.warn(`Failed to auto-connect to ${envConn.name}`);
+            }
+          } catch (error) {
+            console.warn(`Failed to auto-connect to ${envConn.name}:`, error);
+          }
+        }
+
+        // Update connections with final state
+        setConnections([...mergedConnections]);
+      } catch (error) {
+        console.error("Failed to initialize connections:", error);
+        // Fallback to just user connections
+        const savedConnections = loadConnections();
+        setConnections(markEnvironmentConnections(savedConnections));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeConnections();
   }, []);
 
   // Verify a connection is still active

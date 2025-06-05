@@ -6,7 +6,6 @@ A modern, feature-rich Redis management interface built with Next.js. NextRedisU
 
 - **Live Demo**: [https://v0-modern-redis-ui.vercel.app/](https://v0-modern-redis-ui.vercel.app/)
 
-
 ## 🚀 Features
 
 ### 📊 Data Browser
@@ -124,6 +123,60 @@ NextRedisUI supports various Redis configurations:
 - **Redis with Authentication**: username/password
 - **Redis with TLS**: SSL/TLS encrypted connections
 - **Redis Cloud**: Compatible with Redis Cloud, AWS ElastiCache, etc.
+
+### Environment Variables for Auto-Connection
+
+NextRedisUI supports automatic connection to predefined Redis instances using environment variables. This is especially useful for containerized deployments or when you want to pre-configure connections.
+
+#### Configuration Format
+
+Use indexed environment variables to define multiple Redis connections:
+
+```bash
+# Redis Connection 1
+REDIS_HOST_1=localhost
+REDIS_PORT_1=6379
+REDIS_NAME_1=Local Redis
+REDIS_USERNAME_1=
+REDIS_PASSWORD_1=
+REDIS_TLS_1=false
+
+# Redis Connection 2
+REDIS_HOST_2=redis.example.com
+REDIS_PORT_2=6379
+REDIS_NAME_2=Production Redis
+REDIS_USERNAME_2=redis_user
+REDIS_PASSWORD_2=your_password_here
+REDIS_TLS_2=true
+```
+
+#### Environment Variable Reference
+
+| Variable           | Required | Description                                       |
+| ------------------ | -------- | ------------------------------------------------- |
+| `REDIS_HOST_X`     | ✅       | Redis server hostname or IP address               |
+| `REDIS_PORT_X`     | ✅       | Redis server port number                          |
+| `REDIS_NAME_X`     | ❌       | Display name (defaults to "Redis X")              |
+| `REDIS_USERNAME_X` | ❌       | Redis username for authentication                 |
+| `REDIS_PASSWORD_X` | ❌       | Redis password for authentication                 |
+| `REDIS_TLS_X`      | ❌       | Enable TLS/SSL (set to "true", defaults to false) |
+
+#### Features
+
+- **Auto-Connection**: Environment connections automatically connect on application startup
+- **UI Protection**: Environment connections cannot be edited or deleted through the UI
+- **Conflict Resolution**: Environment connections take precedence over user connections with the same host:port
+- **Sequential Numbering**: Use sequential numbers starting from 1 (e.g., `REDIS_HOST_1`, `REDIS_HOST_2`, etc.)
+
+#### Docker Example
+
+```dockerfile
+# Dockerfile or docker-compose.yml
+ENV REDIS_HOST_1=redis-server
+ENV REDIS_PORT_1=6379
+ENV REDIS_NAME_1=Docker Redis
+ENV REDIS_PASSWORD_1=your_secure_password
+```
 
 ## 📱 Usage
 

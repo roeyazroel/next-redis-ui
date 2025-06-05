@@ -32,6 +32,7 @@ type Connection = {
   password?: string;
   tls?: boolean;
   isConnected: boolean;
+  source?: "environment" | "user";
 };
 
 export function ConnectionPanel() {
@@ -104,6 +105,7 @@ export function ConnectionPanel() {
                 <TableHead className="text-muted-foreground">Name</TableHead>
                 <TableHead className="text-muted-foreground">Host</TableHead>
                 <TableHead className="text-muted-foreground">Port</TableHead>
+                <TableHead className="text-muted-foreground">Source</TableHead>
                 <TableHead className="text-muted-foreground">Status</TableHead>
                 <TableHead className="text-muted-foreground">Actions</TableHead>
               </TableRow>
@@ -114,6 +116,20 @@ export function ConnectionPanel() {
                   <TableCell>{connection.name}</TableCell>
                   <TableCell>{connection.host}</TableCell>
                   <TableCell>{connection.port}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={
+                        connection.source === "environment"
+                          ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                          : "bg-gray-500/10 text-gray-400 border-gray-500/20"
+                      }
+                    >
+                      {connection.source === "environment"
+                        ? "Environment"
+                        : "User"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     {connection.isConnected ? (
                       <Badge
@@ -162,6 +178,7 @@ export function ConnectionPanel() {
                         size="icon"
                         onClick={() => handleEditConnection(connection)}
                         className="text-gray-400 hover:text-white"
+                        disabled={connection.source === "environment"}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -170,6 +187,7 @@ export function ConnectionPanel() {
                         size="icon"
                         onClick={() => removeConnection(connection.id)}
                         className="text-gray-400 hover:text-red-500"
+                        disabled={connection.source === "environment"}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -182,7 +200,8 @@ export function ConnectionPanel() {
         </CardContent>
         <CardFooter>
           <p className="text-xs text-muted-foreground">
-            Connections are stored in your browser&apos;s local storage.
+            User connections are stored in your browser&apos;s local storage.
+            Environment connections are configured via environment variables.
           </p>
         </CardFooter>
       </Card>
